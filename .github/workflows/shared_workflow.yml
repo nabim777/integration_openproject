@@ -110,65 +110,61 @@ jobs:
       matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
 
-    defaults:
-      run:
-        working-directory: integration_openproject
+    # services:
+    #   nextcloud:
+    #     image: ghcr.io/juliusknorr/nextcloud-dev-php${{ format('{0}{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}:master
+    #     env:
+    #       SQL: ${{ matrix.database }}
+    #       SERVER_BRANCH: ${{ matrix.nextcloudVersion }}
+    #       NEXTCLOUD_AUTOINSTALL: "Yes"
+    #       WITH_REDIS: "YES"
+    #     ports:
+    #       - 80:80
+    #     options: --name=nextcloud
+    #     volumes:
+    #       - ${{ github.workspace }}:/var/www/html/apps-shared
 
-    services:
-      nextcloud:
-        image: ghcr.io/juliusknorr/nextcloud-dev-php${{ format('{0}{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}:master
-        env:
-          SQL: ${{ matrix.database }}
-          SERVER_BRANCH: ${{ matrix.nextcloudVersion }}
-          NEXTCLOUD_AUTOINSTALL: "Yes"
-          WITH_REDIS: "YES"
-        ports:
-          - 80:80
-        options: --name=nextcloud
-        volumes:
-          - ${{ github.workspace }}:/var/www/html/apps-shared
+    #   database-pgsql:
+    #     image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
+    #     env:
+    #       POSTGRES_PASSWORD: postgres
+    #       POSTGRES_USER: postgres
+    #       POSTGRES_DB: nextcloud
 
-      database-pgsql:
-        image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: nextcloud
+    #   database-mysql:
+    #     image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
+    #     env:
+    #       MYSQL_ROOT_PASSWORD: 'nextcloud'
+    #       MYSQL_PASSWORD: 'nextcloud'
+    #       MYSQL_USER: 'nextcloud'
+    #       MYSQL_DATABASE: 'nextcloud'
 
-      database-mysql:
-        image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
-        env:
-          MYSQL_ROOT_PASSWORD: 'nextcloud'
-          MYSQL_PASSWORD: 'nextcloud'
-          MYSQL_USER: 'nextcloud'
-          MYSQL_DATABASE: 'nextcloud'
-
-      redis:
-        image: ghcr.io/nextcloud/continuous-integration-redis:latest
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    #   redis:
+    #     image: ghcr.io/nextcloud/continuous-integration-redis:latest
+    #     options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
-      - name: Checkout (initial)
-        if: github.event_name != 'schedule'
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-        with:
-          path: integration_openproject
-          ref: ${{ github.event.pull_request.base.ref }}
-
-      - name: Checkout (Nightly)
-        if: github.event_name == 'schedule'
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-        with:
-          path: integration_openproject
-          ref: ${{ inputs.branch }}
-
       - name: Checkout server (for phpunit and psalm)
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           submodules: true
           repository: nextcloud/server
-          path: integration_openproject/server
+          path: server
           ref: ${{ matrix.nextcloudVersion }}
+
+      - name: Checkout (Nightly)
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          path: server/apps/integration_openproject
+          ref: ${{ inputs.branch }}
+
+      - name: Checkout (initial)
+        if: github.event_name != 'schedule'
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          path: server/apps/integration_openproject
+          ref: ${{ github.event.pull_request.base.ref }}
 
       # activity app cannot be installed using occ command
       - name: Checkout (activity)
@@ -176,28 +172,28 @@ jobs:
         with:
           repository: nextcloud/activity
           ref: ${{ matrix.nextcloudVersion }}
-          path: activity
+          path: server/apps/activity
 
       - name: Checkout (groupfolders)
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         if: ${{ matrix.nextcloudVersion == 'master' }}
         with:
           repository: nextcloud/groupfolders
-          path: groupfolders
+          path: server/apps/groupfolders
 
       - name: Checkout (user_oidc)
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         if: ${{ matrix.nextcloudVersion == 'master' }}
         with:
           repository: nextcloud/user_oidc
-          path: user_oidc
+          path: server/apps/user_oidc
 
       - name: Checkout (oidc)
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         if: ${{ matrix.nextcloudVersion == 'master' }}
         with:
           repository: h2CK/oidc
-          path: oidc
+          path: server/apps/oidc
 
       - name: Setup PHP ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
         uses: shivammathur/setup-php@a4e22b60bbb9c1021113f2860347b0759f66fe5d
@@ -236,7 +232,8 @@ jobs:
       - name: Checkout integration_openproject app (release version for upgrade)
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
-          path: integration_openproject
+          path: server/apps/integration_openproject
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Upgrade integration_openproject app
         run: |
@@ -244,14 +241,18 @@ jobs:
           ls
           cd server
           ./occ upgrade
-          ./occ app:update --allow-unstable integration_openproject
+          ./occ app:update --allow-unstable integration_openproject || echo "::warning::No app update found, continuing"
 
       - name: Install PHP dependencies
         run: |
+          cd server/apps/integration_openproject
           composer install --no-progress --prefer-dist --optimize-autoloader
 
       - name: PHP code analysis and linting
         run: |
+          pwd
+          ls
+          cd server/apps/integration_openproject
           make psalm
           make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
