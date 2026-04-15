@@ -214,7 +214,7 @@ jobs:
       - name: Prepare Nextcloud server (for phpunit and psalm)
         run: server/occ maintenance:install --admin-pass=admin
 
-      - name: Build integration_openproject (initial)
+      - name: Build and enable integration_openproject (initial)
         if: github.event_name != 'schedule'
         run: |
           cd server/apps
@@ -224,16 +224,22 @@ jobs:
           make
           # echo "${{ github.event.pull_request.head.ref }}" # output upgrade-test-on-release3.0
           # git checkout ${{ github.event.pull_request.head.ref }}
-
-
+          ## enable the app in the server
+          if [ "${{matrix.nextcloudVersion}}" == "master" ]; then
+            # enable app even if it is not compatible with the master branch
+            ../../occ a:e -f integration_openproject
+          else
+            ../../occ a:e integration_openproject
+          fi
 
   #     - name: Install PHP dependencies
   #       run: composer install --no-progress --prefer-dist --optimize-autoloader
 
-  #     - name: PHP code analysis and linting
-  #       run: |
-  #         make psalm
-  #         make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
+      - name: PHP code analysis and linting
+        run: |
+          cd server/apps/integration_openproject
+          make psalm
+          make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
   #     - name: Setup dependent apps
   #       run: |
