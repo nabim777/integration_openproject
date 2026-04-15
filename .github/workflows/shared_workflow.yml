@@ -192,41 +192,43 @@ jobs:
           repository: h2CK/oidc
           path: server/apps/oidc
 
-      - name: Checkout integration_openproject (initial)
+      - name: Setup PHP ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
+        uses: shivammathur/setup-php@a4e22b60bbb9c1021113f2860347b0759f66fe5d
+        with:
+          php-version: ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
+          tools: composer, phpunit
+          coverage: xdebug
+          extensions: intl, gd, sqlite3
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache PHP dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('./composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Prepare Nextcloud server (for phpunit and psalm)
+        run: server/occ maintenance:install --admin-pass=admin
+
+      - name: Build integration_openproject (initial)
         if: github.event_name != 'schedule'
         run: |
           cd server/apps
-          git clone https://github.com/nextcloud/integration_openproject.git
+          ## clone the integration_openproject repository of specified branch and build the app
+          git clone https://github.com/nextcloud/integration_openproject.git -b ${{ github.event.pull_request.base.ref }}
           cd integration_openproject
-          echo "${{ github.event.pull_request.base.ref }}"
-          git checkout ${{ github.event.pull_request.base.ref }}
+          make
           # echo "${{ github.event.pull_request.head.ref }}" # output upgrade-test-on-release3.0
           # git checkout ${{ github.event.pull_request.head.ref }}
 
-  #     - name: Setup PHP ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
-  #       uses: shivammathur/setup-php@a4e22b60bbb9c1021113f2860347b0759f66fe5d
-  #       with:
-  #         php-version: ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
-  #         tools: composer, phpunit
-  #         coverage: xdebug
-  #         extensions: intl, gd, sqlite3
 
-  #     - name: Get composer cache directory
-  #       id: composer-cache
-  #       run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-  #     - name: Cache PHP dependencies
-  #       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-  #       with:
-  #         path: ${{ steps.composer-cache.outputs.dir }}
-  #         key: ${{ runner.os }}-composer-${{ hashFiles('./composer.lock') }}
-  #         restore-keys: ${{ runner.os }}-composer-
 
   #     - name: Install PHP dependencies
   #       run: composer install --no-progress --prefer-dist --optimize-autoloader
-
-  #     - name: Prepare Nextcloud server (for phpunit and psalm)
-  #       run: server/occ maintenance:install --admin-pass=admin
 
   #     - name: PHP code analysis and linting
   #       run: |
