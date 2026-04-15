@@ -237,8 +237,12 @@ jobs:
 
       - name: PHP code analysis and linting
         run: |
+          pwd
+          ls -l
           cd server/apps/integration_openproject
-          make psalm
+          pwd
+          ls -l
+          vendor/bin/psalm
           make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
   #     - name: Setup dependent apps
