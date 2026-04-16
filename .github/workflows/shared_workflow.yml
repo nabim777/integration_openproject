@@ -114,38 +114,38 @@ jobs:
     #   run:
     #     working-directory: integration_openproject
 
-    # services:
-    #   nextcloud:
-    #     image: ghcr.io/juliusknorr/nextcloud-dev-php${{ format('{0}{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}:master
-    #     env:
-    #       SQL: ${{ matrix.database }}
-    #       SERVER_BRANCH: ${{ matrix.nextcloudVersion }}
-    #       NEXTCLOUD_AUTOINSTALL: "Yes"
-    #       WITH_REDIS: "YES"
-    #     ports:
-    #       - 80:80
-    #     options: --name=nextcloud
-    #     volumes:
-    #       - ${{ github.workspace }}:/var/www/html/apps-shared
+    services:
+      nextcloud:
+        image: ghcr.io/juliusknorr/nextcloud-dev-php${{ format('{0}{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}:master
+        env:
+          SQL: ${{ matrix.database }}
+          SERVER_BRANCH: ${{ matrix.nextcloudVersion }}
+          NEXTCLOUD_AUTOINSTALL: "Yes"
+          WITH_REDIS: "YES"
+        ports:
+          - 80:80
+        options: --name=nextcloud
+        volumes:
+          - ${{ github.workspace }}:/var/www/html/apps-shared
 
-    #   database-pgsql:
-    #     image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
-    #     env:
-    #       POSTGRES_PASSWORD: postgres
-    #       POSTGRES_USER: postgres
-    #       POSTGRES_DB: nextcloud
+      database-pgsql:
+        image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nextcloud
 
-    #   database-mysql:
-    #     image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
-    #     env:
-    #       MYSQL_ROOT_PASSWORD: 'nextcloud'
-    #       MYSQL_PASSWORD: 'nextcloud'
-    #       MYSQL_USER: 'nextcloud'
-    #       MYSQL_DATABASE: 'nextcloud'
+      database-mysql:
+        image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
+        env:
+          MYSQL_ROOT_PASSWORD: 'nextcloud'
+          MYSQL_PASSWORD: 'nextcloud'
+          MYSQL_USER: 'nextcloud'
+          MYSQL_DATABASE: 'nextcloud'
 
-    #   redis:
-    #     image: ghcr.io/nextcloud/continuous-integration-redis:latest
-    #     options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: ghcr.io/nextcloud/continuous-integration-redis:latest
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
       - name: Checkout server (for phpunit and psalm)
@@ -203,7 +203,6 @@ jobs:
       - name: Get composer cache directory
         id: composer-cache
         run: |
-          echo "${{ github.workspace }}"
           echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache PHP dependencies
@@ -216,14 +215,13 @@ jobs:
       - name: Prepare Nextcloud server (for phpunit and psalm)
         run: server/occ maintenance:install --admin-pass=admin
 
-      - name: Build and enable integration_openproject (initial)
+      - name: Enable integration_openproject (initial)
         if: github.event_name != 'schedule'
         run: |
           cd server/apps
           ## clone the integration_openproject repository of specified branch and build the app
           git clone https://github.com/nabim777/integration_openproject.git -b ${{ github.event.pull_request.base.ref }}
           cd integration_openproject
-          make
           # echo "${{ github.event.pull_request.head.ref }}" # output upgrade-test-on-release3.0
           # git checkout ${{ github.event.pull_request.head.ref }}
           ## enable the app in the server
@@ -235,15 +233,24 @@ jobs:
           fi
 
       - name: Upgrade integration_openproject app
+        if: github.event_name != 'schedule'
         run: |
           cd server/apps/integration_openproject
           git checkout ${{ github.event.pull_request.head.ref }}
           ../../occ upgrade
           ../../occ maintenance:mode --off
 
+      - name: Install PHP dependencies
+        run: |
+          cd server/apps/integration_openproject
+          composer install --no-progress --prefer-dist --optimize-autoloader
+
       - name: PHP code analysis and linting
         run: |
           cd server/apps/integration_openproject
+          pwd
+          ls -l
+          composer install --no-progress --prefer-dist --optimize-autoloader
           make psalm
           make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
@@ -265,6 +272,7 @@ jobs:
             ./occ a:e -f activity oidc user_oidc groupfolders
           else
             ./occ a:e activity oidc user_oidc groupfolders
+            cp -r apps/oidc apps/user_oidc apps/groupfolders apps/integration_openproject apps/activity ${{ github.workspace }}
           fi
 
       - name: PHP Unit Tests
@@ -316,34 +324,36 @@ jobs:
           min_coverage: '56'
           path: 'server/apps/integration_openproject/coverage/php/lcov.info'
 
-  #     - name: Configure Nextcloud server
-  #       run: |
-  #         # Disable share rate limit protection
-  #         docker exec nextcloud /bin/bash -c 'occ config:system:set ratelimit.protection.enabled --value false --type bool'
-  #         # Enable apps
-  #         if [ "${{matrix.nextcloudVersion}}" == "master" ]; then
-  #           # enable app even if it is not compatible with the master branch
-  #           docker exec nextcloud /bin/bash -c 'occ a:e -f activity oidc user_oidc groupfolders integration_openproject'
-  #         else
-  #           docker exec nextcloud /bin/bash -c 'occ a:e activity oidc user_oidc groupfolders integration_openproject'
-  #         fi
+      - name: Configure Nextcloud server
+        run: |
+          # Disable share rate limit protection
+          docker exec nextcloud /bin/bash -c 'occ config:system:set ratelimit.protection.enabled --value false --type bool'
+          # Enable apps
+          if [ "${{matrix.nextcloudVersion}}" == "master" ]; then
+            # enable app even if it is not compatible with the master branch
+            docker exec nextcloud /bin/bash -c 'occ a:e -f activity oidc user_oidc groupfolders integration_openproject'
+          else
+            docker exec nextcloud /bin/bash -c 'occ a:e activity oidc user_oidc groupfolders integration_openproject'
+          fi
 
-  #     - name: Wait for Nextcloud server to be ready
-  #       run: |
-  #         if ! timeout 5m bash -c '
-  #           until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
-  #             echo "[INFO] Waiting for server to be ready..."
-  #             sleep 10
-  #           done
-  #         '; then
-  #           echo "[ERROR] Server not ready within 5 minutes."
-  #           exit 1
-  #         fi
+      - name: Wait for Nextcloud server to be ready
+        run: |
+          if ! timeout 5m bash -c '
+            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
+              echo "[INFO] Waiting for server to be ready..."
+              sleep 10
+            done
+          '; then
+            echo "[ERROR] Server not ready within 5 minutes."
+            exit 1
+          fi
 
-  #     - name: API Tests
-  #       env:
-  #         NEXTCLOUD_BASE_URL: http://localhost
-  #       run: make api-test
+      - name: API Tests
+        env:
+          NEXTCLOUD_BASE_URL: http://localhost
+        run: |
+           cd server/apps/integration_openproject
+           make api-test
 
   # notify-nightly-report:
   #   needs:
