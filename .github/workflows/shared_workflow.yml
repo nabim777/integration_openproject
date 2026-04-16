@@ -219,7 +219,7 @@ jobs:
         run: |
           cd server/apps
           ## clone the integration_openproject repository of specified branch and build the app
-          git clone https://github.com/nextcloud/integration_openproject.git -b ${{ github.event.pull_request.base.ref }}
+          git clone https://github.com/nabim777/integration_openproject.git -b ${{ github.event.pull_request.base.ref }}
           cd integration_openproject
           make
           # echo "${{ github.event.pull_request.head.ref }}" # output upgrade-test-on-release3.0
@@ -232,6 +232,13 @@ jobs:
             ../../occ a:e integration_openproject
           fi
 
+      - name: Upgrade integration_openproject app
+        run: |
+          cd server/apps/integration_openproject
+          git checkout ${{ github.event.pull_request.head.ref }}
+          ../../occ upgrade
+          ../../occ maintenance:mode --off
+
   #     - name: Install PHP dependencies
   #       run: composer install --no-progress --prefer-dist --optimize-autoloader
 
@@ -242,7 +249,7 @@ jobs:
           cd server/apps/integration_openproject
           pwd
           ls -l
-          vendor/bin/psalm
+          make psalm
           make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
   #     - name: Setup dependent apps
