@@ -1,0 +1,72 @@
+# This workflow is provided via the organization template repository
+#
+# https://github.com/nextcloud/.github
+# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
+
+# SPDX-FileCopyrightText: 2022 Free Software Foundation Europe e.V. <https://fsfe.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: Upgrade Testing
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+
+    steps:
+      - name: Setup System dependencies
+        run: |
+          sudo apt install -y \
+            python3-venv \
+            python3-wheel \
+            libxslt-dev \
+            libxml2-dev \
+            libz-dev \
+            libpq-dev \
+            build-essential \
+            python3-dev \
+            python3-setuptools \
+            gettext \
+            libssl-dev \
+            libffi-dev \
+            nodejs \
+            yarn
+        
+      - name: Checkout appstore
+        uses: actions/checkout@v3
+        with:
+          repository: nextcloud/appstore
+          path: appstore
+
+      - name: Install Appstore
+        run: |
+          cd appstore
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install poetry==1.8.2
+          make dev-setup
+          python manage.py runserver &
+      
+      - name: Check for Appstore
+        env:
+          DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+        run: |
+          cd appstore
+          status=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:8000)
+          if [ "$status" -eq 200 ]; then
+            echo "OK"
+          else
+            echo "FAILED (status: $status)"
+          fi
+        
+      - name: Register and publish apps
+        run: |
+          wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh
+          bash ./self-hosted-app-store.sh
+
+
+
