@@ -16,6 +16,39 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+    services:
+      nextcloud:
+        image: ghcr.io/juliusknorr/nextcloud-dev-php82:master
+        env:
+          SQL: mysql
+          SERVER_BRANCH: stable29
+          NEXTCLOUD_AUTOINSTALL: "No"
+          WITH_REDIS: "YES"
+        ports:
+          - 80:80
+        options: --name=nextcloud
+        # volumes:
+        #   - ${{ github.workspace }}:/var/www/html/apps-shared
+
+      database-pgsql:
+        image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nextcloud
+
+      database-mysql:
+        image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
+        env:
+          MYSQL_ROOT_PASSWORD: 'nextcloud'
+          MYSQL_PASSWORD: 'nextcloud'
+          MYSQL_USER: 'nextcloud'
+          MYSQL_DATABASE: 'nextcloud'
+
+      redis:
+        image: ghcr.io/nextcloud/continuous-integration-redis:latest
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
 
     steps:
       - name: Setup System dependencies
@@ -68,5 +101,21 @@ jobs:
           wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh
           bash ./self-hosted-app-store.sh
 
+      - name: Wait for Nextcloud server to be ready
+        run: |
+          if ! timeout 5m bash -c '
+            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
+              echo "[INFO] Waiting for server to be ready..."
+              sleep 10
+            done
+          '; then
+            echo "[ERROR] Server not ready within 5 minutes."
+            exit 1
+          fi
+
+      - name: Configure Nextcloud for testing
+        run: |
+          docker exec nextcloud /bin/bash -c 'occ config:system:set appstoreurl --value http://localhost:8000/api/v1'
+          docker exec nextcloud /bin/bash -c 'occ app:enable integration_openproject'
 
 
