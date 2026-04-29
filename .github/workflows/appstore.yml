@@ -1,0 +1,122 @@
+# This workflow is provided via the organization template repository
+#
+# https://github.com/nextcloud/.github
+# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
+
+# SPDX-FileCopyrightText: 2022 Free Software Foundation Europe e.V. <https://fsfe.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: Upgrade Testing
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+    services:
+      nextcloud:
+        image: ghcr.io/juliusknorr/nextcloud-dev-php82:master
+        env:
+          SQL: mysql
+          SERVER_BRANCH: stable29
+          NEXTCLOUD_AUTOINSTALL: "No"
+          WITH_REDIS: "YES"
+        ports:
+          - 80:80
+        options: --name=nextcloud
+        # volumes:
+        #   - ${{ github.workspace }}:/var/www/html/apps-shared
+
+      database-pgsql:
+        image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nextcloud
+
+      database-mysql:
+        image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
+        env:
+          MYSQL_ROOT_PASSWORD: 'nextcloud'
+          MYSQL_PASSWORD: 'nextcloud'
+          MYSQL_USER: 'nextcloud'
+          MYSQL_DATABASE: 'nextcloud'
+
+      redis:
+        image: ghcr.io/nextcloud/continuous-integration-redis:latest
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+
+    steps:
+      - name: Setup System dependencies
+        run: |
+          sudo apt install -y \
+            python3-venv \
+            python3-wheel \
+            libxslt-dev \
+            libxml2-dev \
+            libz-dev \
+            libpq-dev \
+            build-essential \
+            python3-dev \
+            python3-setuptools \
+            gettext \
+            libssl-dev \
+            libffi-dev \
+            nodejs \
+            yarn
+        
+      - name: Checkout appstore
+        uses: actions/checkout@v3
+        with:
+          repository: nextcloud/appstore
+          path: appstore
+
+      - name: Install Appstore
+        run: |
+          cd appstore
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install poetry==1.8.2
+          make dev-setup
+          python manage.py runserver &
+      
+      - name: Check for Appstore
+        env:
+          DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+        run: |
+          cd appstore
+          status=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:8000)
+          if [ "$status" -eq 200 ]; then
+            echo "OK"
+          else
+            echo "FAILED (status: $status)"
+          fi
+        
+      - name: Register and publish apps
+        run: |
+          wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh
+          bash ./self-hosted-app-store.sh
+
+      - name: Wait for Nextcloud server to be ready
+        run: |
+          if ! timeout 5m bash -c '
+            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
+              echo "[INFO] Waiting for server to be ready..."
+              sleep 10
+            done
+          '; then
+            echo "[ERROR] Server not ready within 5 minutes."
+            exit 1
+          fi
+
+      - name: Configure Nextcloud for testing
+        run: |
+          docker exec nextcloud /bin/bash -c 'occ config:system:set appstoreurl --value http://localhost:8000/api/v1'
+          docker exec nextcloud /bin/bash -c 'occ config:system:set allow_local_remote_servers --value true'
+          docker exec nextcloud /bin/bash -c 'occ app:enable integration_openproject'
+
+
