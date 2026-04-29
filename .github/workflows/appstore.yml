@@ -116,6 +116,7 @@ jobs:
       - name: Configure Nextcloud for testing
         run: |
           docker exec nextcloud /bin/bash -c 'occ config:system:set appstoreurl --value http://localhost:8000/api/v1'
+          docker exec nextcloud /bin/bash -c 'occ config:system:set allow_local_remote_servers --value true'
           docker exec nextcloud /bin/bash -c 'occ app:enable integration_openproject'
 
 
