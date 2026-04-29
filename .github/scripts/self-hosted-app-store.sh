@@ -23,6 +23,7 @@ log_success() {
 }
 
 CERTIFICATE="-----BEGIN CERTIFICATE-----\r\nMIIEEjCCAvoCAhF6MA0GCSqGSIb3DQEBCwUAMHsxCzAJBgNVBAYTAkRFMRswGQYD\r\nVQQIDBJCYWRlbi1XdWVydHRlbWJlcmcxFzAVBgNVBAoMDk5leHRjbG91ZCBHbWJI\r\nMTYwNAYDVQQDDC1OZXh0Y2xvdWQgQ29kZSBTaWduaW5nIEludGVybWVkaWF0ZSBB\r\ndXRob3JpdHkwHhcNMjEwMzE4MTMwMTExWhcNMzEwNjI0MTMwMTExWjAiMSAwHgYD\r\nVQQDDBdpbnRlZ3JhdGlvbl9vcGVucHJvamVjdDCCAiIwDQYJKoZIhvcNAQEBBQAD\r\nggIPADCCAgoCggIBALn0ohZShOzR6UJAuN4IErLD5jenUWr83XnKCouC0qeXH6FI\r\nTNGTyOy\/KbDDRIoL1L20xYRl5UKwTbDye10ItUBhNcv72pJ2rDOSJrL84fqMxf00\r\nWdd\/APXJfNNqtgh1QTq9vvim9YCEu7JdeIhZK9ea89RPn47iSj7YijY78mGBfyfm\r\nqpHRYX\/QZAQcwjO2lE9soWUaZlrqu3mxTI218zmaqqcma4x3QakfsZeXZhQSU7D1\r\n6iYG8wy8IaYueJM5OoRRziBXoIfPpwYpEj4RhV1WME9jGhutyrHYg3jAdfvzsFVG\r\ngSVUP2ey1sq3HGZGbzWMBFLDGqfet0lGBIB0HTna1Zvu3ZnuK2uV3MObCmBBbBSs\r\n\/s8hyQTqWEbY2aqVoTBN5lyogwfL6pgZJFvhmtg21oHxBBqqAeQ+TZmWD62WorsX\r\n4F6Ahh1VKkmr5LkVvr2CfME0M1mj9s9gSc7ekXk1oHabH+wwgJV2ZhyezhXgWKgL\r\nUahjSRzkKqp5mbh27sg1kLCx9QNyXxaz8rnAcazGB00JzQlUmXg76cJ0v\/M3qihz\r\nQR5oju\/iMiUYKtqec9LU6wfvmGOOvtl2OFOD3ff69FPS2Km8He4pFWkSqw4DGivE\r\nIJLlgqLGIkWm+uNyocANtYqib52AYwJ\/nFMF6nzOvM1LoxHyJlFmudZRju2jAgMB\r\nAAEwDQYJKoZIhvcNAQELBQADggEBAD8mQtw0p3oh9fyOuyTmalHxoG9rLiV0Q2mz\r\n1T0jonVYN7YqSxS\/yWIQnZQ98x2nU93Be4G9VaLT0NZvRjnem2zemSVvuwp11GeK\r\ne80gJTaJjh8n1Z+gD6GU4C+LjWeiR75sd6Jcqfp3bqL6FGvSzIk3QQOfWuC03aXa\r\nFRleNH6rkMV30sWnXyocatculf7ThHZQMN1c0KuQFrd\/alQh\/+EyjBleLozkeC6G\r\n9IlE9DGRK0NUSvy7W68I7cVhR2ToE8oApdOJ1Cd6TpTYMRtvI2lQ4F7vF++ym0Lw\r\nMIxSI44hNeixh8Yn9rcy\/LqOUgl0niB5hfAiauRwHcOY5wf1hKE=\r\n-----END CERTIFICATE-----"
+SIGNATURE=""
 
 registerApps() {
   app_name=$1
@@ -32,7 +33,7 @@ registerApps() {
     -H "Content-Type: application/json" \
     -d "{
     \"certificate\": \"${CERTIFICATE}\",
-    \"signature\": \"signature\"
+    \"signature\": \"${SIGNATURE}\"
     }")
   if [[ ${register_app} == 201 ]]; then
     log_success "\"${app_name}\" has been registered successfully!"
@@ -55,18 +56,18 @@ publishApps() {
     http://localhost:8000/api/v1/apps/releases \
     -H "Content-Type: application/json" \
     -d "{
-    \"download\":\"https://github.com/nextcloud/${app_name}/releases/download/v${app_version}/${app_name}-2.10.0.tar.gz\",
-    \"signature\": \"signature\"
+    \"download\":\"https://github.com/nextcloud/${app_name}/releases/download/v${app_version}/${app_name}-${app_version}.tar.gz\",
+    \"signature\": \"${SIGNATURE}\"
     }")
   if [[ ${register_app} == 200 ]]; then
-    log_success "\"${app_name}\" has been updated successfully!"
+    log_success "\"${app_name} ${app_version}\" has been updated successfully!"
   elif [[ ${register_app} == 201 ]]; then
-    log_success "\"${app_name}\" has been published successfully!"
+    log_success "\"${app_name} ${app_version}\" has been published successfully!"
   else
-    log_error "Failed to publish \"${app_name}\""
+    log_error "Failed to publish \"${app_name} ${app_version}\""
     exit 1
   fi
 }
 
 registerApps "integration_openproject"
-publishApps "integration_openproject" "2.10.0"
+publishApps "integration_openproject" "2.9.2"
