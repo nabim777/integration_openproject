@@ -56,15 +56,6 @@ jobs:
           coverage: xdebug
           tools: php-cs-fixer, phpunit
 
-
-      # - name: Checkout server (for phpunit and psalm)
-      #   uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-      #   with:
-      #     submodules: true
-      #     repository: nextcloud/server
-      #     path: integration_openproject/server
-      #     ref: ${{ matrix.nextcloudVersion }}
-
       - name: Build nextcloud project
         # if: ${{ startsWith( steps.tag.outputs.currenttag , 'v' ) }}
         # id: build_release
@@ -93,16 +84,20 @@ jobs:
             --database-pass nextcloud \
             --admin-user admin \
             --admin-pass admin
-
-          php -S 127.0.0.1:8080 -t ~/html/nextcloud >/tmp/nextcloud.log 2>&1 &
+          php occ maintenance:mode --off
+          sudo php -S localhost:80 -t ~/html/nextcloud &
+          # php -S 127.0.0.1:8080 -t ~/html/nextcloud >/tmp/nextcloud.log 2>&1 &
         # env:
           # APP_CRT: ${{ secrets.APP_CRT }}
           # APP_KEY: ${{ secrets.APP_KEY }}
 
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
+
       - name: Wait for Nextcloud server to be ready
         run: |
           if ! timeout 5m bash -c '
-            until curl -s -f http://localhost/server/status.php | grep '"'"'"installed":true'"'"'; do
+            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
               echo "[INFO] Waiting for server to be ready..."
               sleep 10
             done
@@ -161,14 +156,14 @@ jobs:
         run: |
           wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh
           bash ./self-hosted-app-store.sh
-          sudo apt install tree
-          tree -L 4
 
       - name: Configure Nextcloud for testing
         run: |
+          ls -l
           cd ~/html/nextcloud
-          occ config:system:set appstoreurl --value http://localhost:8000/api/v1
-          occ config:system:set allow_local_remote_servers --value true
-          occ app:enable integration_openproject
+          ls -l
+          php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
+          php occ config:system:set allow_local_remote_servers --value true
+          # php occ app:enable integration_openproject
 
 
