@@ -17,25 +17,11 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
     services:
-      nextcloud:
-        image: ghcr.io/juliusknorr/nextcloud-dev-php82:master
-        env:
-          SQL: mysql
-          SERVER_BRANCH: stable29
-          NEXTCLOUD_AUTOINSTALL: "No"
-          WITH_REDIS: "YES"
-        ports:
-          - 80:80
-        options: --name=nextcloud
-        # volumes:
-        #   - ${{ github.workspace }}:/var/www/html/apps-shared
-
-      database-pgsql:
-        image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: nextcloud
+      #   image: ghcr.io/nextcloud/continuous-integration-postgres-14:latest
+      #   env:
+      #     POSTGRES_PASSWORD: postgres
+      #     POSTGRES_USER: postgres
+      #     POSTGRES_DB: nextcloud
 
       database-mysql:
         image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
@@ -44,14 +30,84 @@ jobs:
           MYSQL_PASSWORD: 'nextcloud'
           MYSQL_USER: 'nextcloud'
           MYSQL_DATABASE: 'nextcloud'
+        ports:
+          - 3306:3306
 
-      redis:
-        image: ghcr.io/nextcloud/continuous-integration-redis:latest
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      # redis:
+      #   image: ghcr.io/nextcloud/continuous-integration-redis:latest
+      #   options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
 
     steps:
-      - name: Setup System dependencies
+      - name: Setup NodeJS
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: 20
+
+      - name: Setup npm
+        run: npm i -g npm
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@a4e22b60bbb9c1021113f2860347b0759f66fe5d
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, mysql, gd
+          ini-values: post_max_size=256M, max_execution_time=180
+          coverage: xdebug
+          tools: php-cs-fixer, phpunit
+
+      - name: Build nextcloud project
+        # if: ${{ startsWith( steps.tag.outputs.currenttag , 'v' ) }}
+        # id: build_release
+        run: |
+          # echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
+          # echo "###### copy certificate"
+          # mkdir -p ~/.nextcloud/certificates
+          # echo "$APP_CRT" > ~/.nextcloud/certificates/${APP_ID}.crt
+          # echo "$APP_KEY" > ~/.nextcloud/certificates/${APP_ID}.key
+          echo "###### install dependencies"
+          export DEBIAN_FRONTEND=noninteractive
+          # sudo apt update -y
+          # sudo apt install make openssl -y
+          echo "###### installing nextcloud"
+          mkdir ~/html
+          git clone https://github.com/nextcloud/server.git --recursive --depth 1 -b stable29 ~/html/nextcloud
+          cd ~/html/nextcloud
+          git submodule update --init
+          mkdir -p data
+          # chown -R www-data:www-data config data apps
+          php occ maintenance:install \
+            --database mysql \
+            --database-name nextcloud \
+            --database-host 127.0.0.1 \
+            --database-user nextcloud \
+            --database-pass nextcloud \
+            --admin-user admin \
+            --admin-pass admin
+          php occ maintenance:mode --off
+          sudo php -S localhost:80 -t ~/html/nextcloud &
+          # php -S 127.0.0.1:8080 -t ~/html/nextcloud >/tmp/nextcloud.log 2>&1 &
+        # env:
+          # APP_CRT: ${{ secrets.APP_CRT }}
+          # APP_KEY: ${{ secrets.APP_KEY }}
+
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
+
+      - name: Wait for Nextcloud server to be ready
+        run: |
+          if ! timeout 5m bash -c '
+            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
+              echo "[INFO] Waiting for server to be ready..."
+              sleep 10
+            done
+          '; then
+            echo "[ERROR] Server not ready within 5 minutes."
+            exit 1
+          fi
+
+
+      - name: Setup System dependencies for appstore
         run: |
           sudo apt install -y \
             python3-venv \
@@ -101,22 +157,13 @@ jobs:
           wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh
           bash ./self-hosted-app-store.sh
 
-      - name: Wait for Nextcloud server to be ready
-        run: |
-          if ! timeout 5m bash -c '
-            until curl -s -f http://localhost/status.php | grep '"'"'"installed":true'"'"'; do
-              echo "[INFO] Waiting for server to be ready..."
-              sleep 10
-            done
-          '; then
-            echo "[ERROR] Server not ready within 5 minutes."
-            exit 1
-          fi
-
       - name: Configure Nextcloud for testing
         run: |
-          docker exec nextcloud /bin/bash -c 'occ config:system:set appstoreurl --value http://localhost:8000/api/v1'
-          docker exec nextcloud /bin/bash -c 'occ config:system:set allow_local_remote_servers --value true'
-          docker exec nextcloud /bin/bash -c 'occ app:enable integration_openproject'
+          ls -l
+          cd ~/html/nextcloud
+          ls -l
+          php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
+          php occ config:system:set allow_local_remote_servers --value true
+          # php occ app:enable integration_openproject
 
 
