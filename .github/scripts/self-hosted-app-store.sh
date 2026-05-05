@@ -66,8 +66,8 @@ publishApps() {
   else
     log_error "Failed to publish \"${app_name} ${app_version}\""
     exit 1
-  fi
+  fiq
 }
 
 registerApps "integration_openproject"
-publishApps "integration_openproject" "2.9.2"
+publishApps "integration_openproject" "2.10.1"

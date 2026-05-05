@@ -91,9 +91,6 @@ jobs:
           # APP_CRT: ${{ secrets.APP_CRT }}
           # APP_KEY: ${{ secrets.APP_KEY }}
 
-      - name: Setup Debug Session
-        uses: csexton/debugger-action@master
-
       - name: Wait for Nextcloud server to be ready
         run: |
           if ! timeout 5m bash -c '
@@ -166,4 +163,12 @@ jobs:
           php occ config:system:set allow_local_remote_servers --value true
           # php occ app:enable integration_openproject
 
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
 
+      - name: Configure Nextcloud for testing
+        run: |
+          ls -l
+          cd ~/html/nextcloud
+          ls -l
+          php occ app:enable integration_openproject
