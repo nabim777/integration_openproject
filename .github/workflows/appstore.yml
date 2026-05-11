@@ -109,9 +109,6 @@ jobs:
         run: |
           wget https://raw.githubusercontent.com/nabim777/integration_openproject/${{github.head_ref}}/.github/scripts/upgrade-testing/build-and-release-apps.sh
 
-      - name: Setup Debug Session
-        uses: csexton/debugger-action@master
-
       - name: Build apps with certicates
         env:
           APP_ID: integration_openproject
@@ -121,6 +118,9 @@ jobs:
           TAG=2.9.2 bash ./build-and-release-apps.sh
           pwd
           echo "Workspace is ${{ github.workspace }}"
+
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
 
       # - name: Setup System dependencies for appstore
       #   run: |

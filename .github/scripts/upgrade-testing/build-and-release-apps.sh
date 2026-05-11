@@ -37,9 +37,9 @@ cd publish
 
 # remove the app directory if it already exists
 # Necessary step for next app release
-if [ -d "$APP_ID" ] || [ -f "$APP_ID-*.tar.gz" ]; then
-  rm -rf "$APP_ID"
-  rm -rf "$APP_ID-*.tar.gz"
+if [ -d $APP_ID ] || [ -f $APP_ID-*.tar.gz ]; then
+  rm -rf $APP_ID
+  rm -rf $APP_ID-*.tar.gz
   log_info "Removed existing $APP_ID directory and tar.gz files."
 fi
 
@@ -107,13 +107,14 @@ else
     # add new line and add crt in nextcloud
     echo "" >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
     cat app.crt >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
-    # Sign the app
-    sudo chown www-data:$USER app.key
+	# fix permisions for signing
+    sudo chown $USER: app.key
 fi
 
-sudo chown www-data:$USER -R $APP_ID
-
 # fix permisions for signing
+sudo chown -R $USER: $APP_ID
+
+# Sign the app
 # need full path for signing
 log_info "Signing the app using occ integrity:sign-app command..."
 php ${NEXCLOUD_PATH}/occ integrity:sign-app \
@@ -125,7 +126,7 @@ php ${NEXCLOUD_PATH}/occ integrity:sign-app \
 # php /home/runner/html/nextcloud/occ integrity:sign-app \
 #   --privateKey=/home/runner/work/integration_openproject/integration_openproject/publish/app.key \
 #   --certificate=/home/runner/work/integration_openproject/integration_openproject/publish/app.crt \
-#   --path=/home/runner/work/integration_openproject/integration_openproject/publish/integration_openprojectpublish 
+#   --path=/home/runner/work/integration_openproject/integration_openproject/publish/integration_openproject
 
 
 # Archive the app
