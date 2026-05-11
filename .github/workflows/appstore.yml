@@ -71,11 +71,11 @@ jobs:
           # sudo apt install make openssl -y
           echo "###### installing nextcloud"
           mkdir ~/html
-          git clone https://github.com/nextcloud/server.git --recursive --depth 1 -b stable29 ~/html/nextcloud
+          git clone https://github.com/nextcloud/server.git --depth 1 -b stable29 ~/html/nextcloud
           cd ~/html/nextcloud
           git submodule update --init
           mkdir -p data
-          # chown -R www-data:www-data config data apps
+          # sudo chown -R www-data: config data apps
           php occ maintenance:install \
             --database mysql \
             --database-name nextcloud \
@@ -103,6 +103,24 @@ jobs:
             exit 1
           fi
 
+      # APP_ID=integration_openproject NEXCLOUD_PATH=/home/runner/html/nextcloud WORKING_DIRECTORY=/home/runner/work/integration_openproject/integration_openproject TAG=2.9.2 bash ./build-and-release-apps.sh
+
+      - name: Download the bash
+        run: |
+          wget https://raw.githubusercontent.com/nabim777/integration_openproject/${{github.head_ref}}/.github/scripts/upgrade-testing/build-and-release-apps.sh
+
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
+
+      - name: Build apps with certicates
+        env:
+          APP_ID: integration_openproject
+          NEXCLOUD_PATH: /home/runner/html/nextcloud
+          WORKING_DIRECTORY: ${{ github.workspace }}
+        run: |
+          TAG=2.9.2 bash ./build-and-release-apps.sh
+          pwd
+          echo "Workspace is ${{ github.workspace }}"
 
       # - name: Setup System dependencies for appstore
       #   run: |
@@ -121,7 +139,7 @@ jobs:
       #       libffi-dev \
       #       nodejs \
       #       yarn
-        
+
       # - name: Checkout appstore
       #   uses: actions/checkout@v3
       #   with:
@@ -136,7 +154,7 @@ jobs:
       #     pip install poetry==1.8.2
       #     make dev-setup
       #     python manage.py runserver &
-      
+
       # - name: Check for Appstore
       #   env:
       #     DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
@@ -148,7 +166,7 @@ jobs:
       #     else
       #       echo "FAILED (status: $status)"
       #     fi
-        
+
       # - name: Register and publish apps
       #   run: |
       #     wget https://raw.githubusercontent.com/nabim777/integration_openproject/appstore/.github/scripts/self-hosted-app-store.sh

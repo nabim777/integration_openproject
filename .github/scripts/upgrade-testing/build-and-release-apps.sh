@@ -23,9 +23,10 @@ log_success() {
 }
 
 # env required
-tag=2.9.2
-NEXCLOUD_PATH=/home/nabin/www/stable29
-WORKING_DIRECTORY=/home/nabin/www/fork-integrationOpenproject # current working directory simply done by pwd command
+# TAG=2.9.2
+# NEXCLOUD_PATH=/home/nabin/www/stable29
+# WORKING_DIRECTORY=/home/nabin/www/fork-integrationOpenproject # current working directory simply done by pwd command
+# APP_ID=integration_openproject
 
 if [ ! -d publish ]; then
   mkdir publish
@@ -36,16 +37,16 @@ cd publish
 
 # remove the app directory if it already exists
 # Necessary step for next app release
-if [ -d integration_openproject ] || [ -f integration_openproject-*.tar.gz ]; then
-  rm -rf integration_openproject
-  rm -rf integration_openproject-*.tar.gz
-  log_info "Removed existing integration_openproject directory and tar.gz files."
+if [ -d "$APP_ID" ] || [ -f "$APP_ID-*.tar.gz" ]; then
+  rm -rf "$APP_ID"
+  rm -rf "$APP_ID-*.tar.gz"
+  log_info "Removed existing $APP_ID directory and tar.gz files."
 fi
 
-git clone https://github.com/nextcloud/integration_openproject.git --depth=1 -b v$tag || { log_error "Failed to clone integration_openproject $tag repository."; exit 1; }
-log_success "Cloned integration_openproject $tag repository"
+git clone https://github.com/nextcloud/$APP_ID.git --depth=1 -b v$TAG || { log_error "Failed to clone $APP_ID $TAG repository."; exit 1; }
+log_success "Cloned $APP_ID $TAG repository"
 
-cd integration_openproject || { log_error "Failed to enter integration_openproject directory."; exit 1; }
+cd $APP_ID || { log_error "Failed to enter $APP_ID directory."; exit 1; }
 make || { log_error "Failed to build the app. Check make configuration."; exit 1; }
 log_success "Built the app."
 
@@ -99,7 +100,7 @@ else
     -keyout app.key \
     -out app.crt \
     -days 3650 \
-    -subj "/CN=integration_openproject" \
+    -subj "/CN=$APP_ID" \
     -addext "basicConstraints=CA:FALSE" \
     -addext "keyUsage=digitalSignature" \
     -addext "extendedKeyUsage=codeSigning" || { log_error "Failed to generate app signing certificate and key."; exit 1; }
@@ -110,21 +111,35 @@ else
     sudo chown www-data:$USER app.key
 fi
 
-sudo chown www-data:$USER -R integration_openproject
+sudo chown www-data:$USER -R $APP_ID
 
 # fix permisions for signing
 # need full path for signing
 log_info "Signing the app using occ integrity:sign-app command..."
-sudo -u www-data ${NEXCLOUD_PATH}/occ integrity:sign-app \
+php ${NEXCLOUD_PATH}/occ integrity:sign-app \
   --privateKey=${WORKING_DIRECTORY}/publish/app.key \
   --certificate=${WORKING_DIRECTORY}/publish/app.crt \
-  --path=${WORKING_DIRECTORY}/publish/integration_openproject || { log_error "Failed to sign app."; exit 1; }
+  --path=${WORKING_DIRECTORY}/publish/$APP_ID || { log_error "Failed to sign app."; exit 1; }
+
+
+# php /home/runner/html/nextcloud/occ integrity:sign-app \
+#   --privateKey=/home/runner/work/integration_openproject/integration_openproject/publish/app.key \
+#   --certificate=/home/runner/work/integration_openproject/integration_openproject/publish/app.crt \
+#   --path=/home/runner/work/integration_openproject/integration_openproject/publish/integration_openprojectpublish 
+
 
 # Archive the app
-tar -czf integration_openproject-$tag.tar.gz integration_openproject || { log_error "Failed to archive app into tar.gz file."; exit 1; }
-log_success "Archived the app into integration_openproject-$tag.tar.gz."
+tar -czf $APP_ID-$TAG.tar.gz $APP_ID || { log_error "Failed to archive app into tar.gz file."; exit 1; }
+log_success "Archived the app into $APP_ID-$TAG.tar.gz."
 
 # Sign the archive
-sudo openssl dgst -sha512 -sign app.key integration_openproject-$tag.tar.gz | openssl base64 | tee sign.txt || { log_error "Failed to sign archive."; exit 1; }
+sudo openssl dgst -sha512 -sign app.key $APP_ID-$TAG.tar.gz | openssl base64 | tee sign.txt
+
+# check sign.txt is empty
+if [ ! -s sign.txt ]; then
+  log_error "Failed to sign the archive. Signature file is empty."
+  exit 1
+fi
+
 log_success "Signed the archive and saved the signature in sign.txt."
 log_success "App build and release process completed successfully."

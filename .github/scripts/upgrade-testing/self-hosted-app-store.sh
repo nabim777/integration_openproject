@@ -66,7 +66,7 @@ publishApps() {
   else
     log_error "Failed to publish \"${app_name} ${app_version}\""
     exit 1
-  fiq
+  fi
 }
 
 registerApps "integration_openproject"
