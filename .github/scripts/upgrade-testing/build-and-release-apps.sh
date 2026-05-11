@@ -50,12 +50,13 @@ cd $APP_ID || { log_error "Failed to enter $APP_ID directory."; exit 1; }
 make || { log_error "Failed to build the app. Check make configuration."; exit 1; }
 log_success "Built the app."
 
-# copy required app files
-rm -rf server \
+# remove unnecessary app files
+rm -rf -- \
+  server \
   dev \
-  git \
+  .git \
   appinfo/signature.json \
-  '*.swp' \
+  *.swp \
   build \
   .gitignore \
   .travis.yml \
@@ -66,7 +67,7 @@ rm -rf server \
   node_modules \
   src \
   translationfiles \
-  'webpack.*' \
+  webpack.* \
   stylelint.config.js \
   .eslintrc.js \
   .github \
@@ -78,16 +79,17 @@ rm -rf server \
   l10n/.tx \
   l10n/l10n.pl \
   l10n/templates \
-  'l10n/*.sh' \
-  'l10n/[a-z][a-z]' \
-  'l10n/[a-z][a-z]_[A-Z][A-Z]' \
+  l10n/*.sh \
+  l10n/[a-z][a-z] \
+  l10n/[a-z][a-z]_[A-Z][A-Z] \
   l10n/no-php \
   makefile \
   screenshots \
-  'phpunit*xml' \
+  phpunit*xml \
   tests \
   ci \
-  vendor/bin
+  vendor
+
 log_info "Removed unnecessary files and directories."
 cd ..
 

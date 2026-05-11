@@ -114,13 +114,27 @@ jobs:
           APP_ID: integration_openproject
           NEXCLOUD_PATH: /home/runner/html/nextcloud
           WORKING_DIRECTORY: ${{ github.workspace }}
+          TAG: 2.9.2
         run: |
-          TAG=2.9.2 bash ./build-and-release-apps.sh
+          bash ./build-and-release-apps.sh
           pwd
           echo "Workspace is ${{ github.workspace }}"
 
-      - name: Setup Debug Session
-        uses: csexton/debugger-action@master
+      # - name: Setup Debug Session
+      #   uses: csexton/debugger-action@master
+
+      - name: Upload integration_openproject apps
+        id: first-artifact-upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: publish/integration_openproject*.tar.gz
+          if-no-files-found: error
+      
+      - name: Get the download link
+        id: get-download-link
+        run: |
+          full_url="https://github.com/nabim777/integration_openproject/actions/runs/${{github.run_id}}/artifacts/${{steps.first-artifact-upload.outputs.artifact-id}}"
+          
 
       # - name: Setup System dependencies for appstore
       #   run: |
