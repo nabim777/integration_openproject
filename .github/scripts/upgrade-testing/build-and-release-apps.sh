@@ -23,91 +23,108 @@ log_success() {
 }
 
 # env required
-# INTEGRATION_OPENPROJECT_PATH => path to the integration_openproject app
-# NEXCLOUD_PATH => path to the nextcloud server
+tag=2.9.2
+NEXCLOUD_PATH=/home/nabin/www/stable29
+WORKING_DIRECTORY=/home/nabin/www/fork-integrationOpenproject # current working directory simply done by pwd command
 
-
-if [ -z "$INTEGRATION_OPENPROJECT_PATH" ] || [ -z "$NEXCLOUD_PATH" ]; then
-  log_error "INTEGRATION_OPENPROJECT_PATH or NEXCLOUD_PATH environment variable is not set."
-  exit 1
+if [ ! -d publish ]; then
+  mkdir publish
+  log_info "Created publish directory."
 fi
 
+cd publish
 
-# build
-make -C ${INTEGRATION_OPENPROJECT_PATH}
+# remove the app directory if it already exists
+# Necessary step for next app release
+if [ -d integration_openproject ] || [ -f integration_openproject-*.tar.gz ]; then
+  rm -rf integration_openproject
+  rm -rf integration_openproject-*.tar.gz
+  log_info "Removed existing integration_openproject directory and tar.gz files."
+fi
+
+git clone https://github.com/nextcloud/integration_openproject.git --depth=1 -b v$tag || { log_error "Failed to clone integration_openproject $tag repository."; exit 1; }
+log_success "Cloned integration_openproject $tag repository"
+
+cd integration_openproject || { log_error "Failed to enter integration_openproject directory."; exit 1; }
+make || { log_error "Failed to build the app. Check make configuration."; exit 1; }
+log_success "Built the app."
 
 # copy required app files
-rsync -a \
---exclude=server \
---exclude=dev \
---exclude=.git \
---exclude=appinfo/signature.json \
---exclude='*.swp' \
---exclude=build \
---exclude=.gitignore \
---exclude=.travis.yml \
---exclude=.scrutinizer.yml \
---exclude=CONTRIBUTING.md \
---exclude=composer.phar \
---exclude=js/node_modules \
---exclude=node_modules \
---exclude=src \
---exclude=translationfiles \
---exclude='webpack.*' \
---exclude=stylelint.config.js \
---exclude=.eslintrc.js \
---exclude=.github \
---exclude=.gitlab-ci.yml \
---exclude=crowdin.yml \
---exclude=tools \
---exclude=.tx \
---exclude=.l10nignore \
---exclude=l10n/.tx \
---exclude=l10n/l10n.pl \
---exclude=l10n/templates \
---exclude='l10n/*.sh' \
---exclude='l10n/[a-z][a-z]' \
---exclude='l10n/[a-z][a-z]_[A-Z][A-Z]' \
---exclude=l10n/no-php \
---exclude=makefile \
---exclude=screenshots \
---exclude='phpunit*xml' \
---exclude=tests \
---exclude=ci \
---exclude=vendor/bin \
-integration_openproject publish/
+rm -rf server \
+  dev \
+  git \
+  appinfo/signature.json \
+  '*.swp' \
+  build \
+  .gitignore \
+  .travis.yml \
+  .scrutinizer.yml \
+  CONTRIBUTING.md \
+  composer.phar \
+  js/node_modules \
+  node_modules \
+  src \
+  translationfiles \
+  'webpack.*' \
+  stylelint.config.js \
+  .eslintrc.js \
+  .github \
+  .gitlab-ci.yml \
+  crowdin.yml \
+  tools \
+  .tx \
+  .l10nignore \
+  l10n/.tx \
+  l10n/l10n.pl \
+  l10n/templates \
+  'l10n/*.sh' \
+  'l10n/[a-z][a-z]' \
+  'l10n/[a-z][a-z]_[A-Z][A-Z]' \
+  l10n/no-php \
+  makefile \
+  screenshots \
+  'phpunit*xml' \
+  tests \
+  ci \
+  vendor/bin
+log_info "Removed unnecessary files and directories."
+cd ..
 
-cd ${INTEGRATION_OPENPROJECT_PATH}/publish
+# https://nextcloudappstore.readthedocs.io/en/latest/developer.html#obtaining-a-certificate
+if [ -f "app.key" ] || [ -f "app.crt" ]; then
+  log_info "app.key or app.crt already exists."
+else
+  log_info "Generating app.key and app.crt..."
+  sudo openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
+    -keyout app.key \
+    -out app.crt \
+    -days 3650 \
+    -subj "/CN=integration_openproject" \
+    -addext "basicConstraints=CA:FALSE" \
+    -addext "keyUsage=digitalSignature" \
+    -addext "extendedKeyUsage=codeSigning" || { log_error "Failed to generate app signing certificate and key."; exit 1; }
+    # add new line and add crt in nextcloud
+    echo "" >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
+    cat app.crt >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
+    # Sign the app
+    sudo chown www-data:$USER app.key
+fi
 
-## https://nextcloudappstore.readthedocs.io/en/latest/developer.html#obtaining-a-certificate
-
-openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
-  -keyout app.key \
-  -out app.crt \
-  -days 3650 \
-  -subj "/CN=integration_openproject" \
-  -addext "basicConstraints=CA:FALSE" \
-  -addext "keyUsage=digitalSignature" \
-  -addext "extendedKeyUsage=codeSigning"
-
-
-# add new line
-echo "" >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
-cat app.crt >> ${NEXCLOUD_PATH}/resources/codesigning/root.crt
-
-# Sign the app
-sudo chown www-data:$USER app.key
 sudo chown www-data:$USER -R integration_openproject
 
 # fix permisions for signing
-sudo -u www-data ./occ integrity:sign-app \
-  --privateKey=${INTEGRATION_OPENPROJECT_PATH}/publish/app.key \
-  --certificate=${INTEGRATION_OPENPROJECT_PATH}/publish/app.crt \
-  --path=${INTEGRATION_OPENPROJECT_PATH}/publish/integration_openproject
+# need full path for signing
+log_info "Signing the app using occ integrity:sign-app command..."
+sudo -u www-data ${NEXCLOUD_PATH}/occ integrity:sign-app \
+  --privateKey=${WORKING_DIRECTORY}/publish/app.key \
+  --certificate=${WORKING_DIRECTORY}/publish/app.crt \
+  --path=${WORKING_DIRECTORY}/publish/integration_openproject || { log_error "Failed to sign app."; exit 1; }
 
+# Archive the app
+tar -czf integration_openproject-$tag.tar.gz integration_openproject || { log_error "Failed to archive app into tar.gz file."; exit 1; }
+log_success "Archived the app into integration_openproject-$tag.tar.gz."
 
-#4. Archive the app
-tar -czf integration_openproject-2.9.2.tar.gz integration_openproject
-
-#5. Sign the archive
-openssl dgst -sha512 -sign app.key integration_openproject-2.9.2.tar.gz | openssl base64
+# Sign the archive
+sudo openssl dgst -sha512 -sign app.key integration_openproject-$tag.tar.gz | openssl base64 | tee sign.txt || { log_error "Failed to sign archive."; exit 1; }
+log_success "Signed the archive and saved the signature in sign.txt."
+log_success "App build and release process completed successfully."
