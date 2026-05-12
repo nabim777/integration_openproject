@@ -19,9 +19,10 @@
 	<projectFiles>
 		<directory name="lib" />
 		<directory name="tests" />
-		<ignoreFiles>
+		<ignoreFiles allowMissingFiles="true">
 			<directory name="vendor" />
 			<directory name="server/lib" />
+			<directory name="../../lib" />
 		</ignoreFiles>
 	</projectFiles>
 	<extraFiles>
@@ -73,7 +74,7 @@
 			</errorLevel>
 		</UndefinedDocblockClass>
 		<NoValue>
-			<errorLevel type="suppress">
+			<errorLevel type="suppress" allowMissingFiles="true">
 				<!-- make psalm not complain if activity app does not exist -->
 				<file name="lib/Controller/FilesController.php"/>
 			</errorLevel>
