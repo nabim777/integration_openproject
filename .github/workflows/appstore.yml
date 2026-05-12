@@ -29,6 +29,11 @@ jobs:
           - 3306:3306
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          path: integration_openproject
+
       - name: Setup NodeJS
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
         with:
@@ -50,15 +55,7 @@ jobs:
         # if: ${{ startsWith( steps.tag.outputs.currenttag , 'v' ) }}
         # id: build_release
         run: |
-          # echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
-          # echo "###### copy certificate"
-          # mkdir -p ~/.nextcloud/certificates
-          # echo "$APP_CRT" > ~/.nextcloud/certificates/${APP_ID}.crt
-          # echo "$APP_KEY" > ~/.nextcloud/certificates/${APP_ID}.key
-          echo "###### install dependencies"
           export DEBIAN_FRONTEND=noninteractive
-          # sudo apt update -y
-          # sudo apt install make openssl -y
           echo "###### installing nextcloud"
           mkdir ~/html
           git clone https://github.com/nextcloud/server.git --recursive --depth 1 -b stable29 ~/html/nextcloud
@@ -109,7 +106,7 @@ jobs:
             yarn
         
       - name: Checkout appstore
-        uses: actions/checkout@v3
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           repository: nextcloud/appstore
           path: appstore
@@ -139,29 +136,30 @@ jobs:
           APP_VERSION: 2.9.2
           SIGNATURE: signature1
         run: |
-          wget https://raw.githubusercontent.com/nabim777/integration_openproject/${{github.head_ref}}/.github/scripts/self-hosted-app-store.sh
-          bash ./self-hosted-app-store.sh
+          cd integration_openproject
+          bash ./.github/scripts/self-hosted-app-store.sh
 
       - name: Configure Nextcloud for testing
         run: |
-          ls -l
+          # making the signature verification always pass for testing
+          # by making the $verified variable true in Installer.php
           sed -i.bak 's/$verified = .*/$verified = true;/' /home/runner/html/nextcloud/lib/private/Installer.php || {
           echo "::error::Failed to patch Installer.php with sed"
           exit 1
           }
           cd ~/html/nextcloud
-          ls -l
           php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
           php occ config:system:set allow_local_remote_servers --value true
           php occ app:install integration_openproject
 
-      - name: Register and publish another apps
+      - name: Register and publish next release of the app
         env:
           APP_ID: integration_openproject
           APP_VERSION: 2.10.0
           SIGNATURE: signature2
         run: |
-          bash ./self-hosted-app-store.sh
+          cd integration_openproject
+          bash ./.github/scripts/self-hosted-app-store.sh
 
       - name: upgrade apps
         run: |
@@ -169,6 +167,16 @@ jobs:
           # latest data didn't get fetched properly, so we need to clear the appstore cache
           echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
           php occ app:update --allow-unstable integration_openproject
+
+      - name: API Tests
+        env:
+          NEXTCLOUD_BASE_URL: http://localhost
+        run: |
+          cd integration_openproject
+          # build apps
+          make
+          # Run API tests
+          make api-test
 
       # - name: Setup Debug Session
       #   uses: csexton/debugger-action@master
