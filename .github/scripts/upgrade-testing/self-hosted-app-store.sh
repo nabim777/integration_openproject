@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2023-2024 Jankari Tech Pvt. Ltd.
+# SPDX-FileCopyrightText: 2023 Bundesministerium des Innern und für Heimat, PG ZenDiS "Projektgruppe für Aufbau ZenDiS"
+# SPDX-FileCopyrightText: 2023 Nextcloud GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#!/usr/bin/env bash
+
+# This bash script is to register and publish the apps in self-hosted appstore.
+# To run this script the self-hosted appstore instances must be up and running
+
+set -e
+
+# helper functions
+log_error() {
+  echo -e "\e[31m$1\e[0m"
+}
+
+log_info() {
+  echo -e "\e[37m$1\e[0m"
+}
+
+log_success() {
+  echo -e "\e[32m$1\e[0m"
+}
+
+# Sample of signature and signature required
+# CERTIFICATE="-----BEGIN CERTIFICATE-----\r\nMIIEEjCCAvoCAhF6MA0GCSqGSIb3DQEBCwUAMHsxCzAJBgNVBAYTAkRFMRswGQYD\r\nVQQIDBJCYWRlbi1XdWVydHRlbWJlcmcxFzAVBgNVBAoMDk5leHRjbG91ZCBHbWJI\r\nMTYwNAYDVQQDDC1OZXh0Y2xvdWQgQ29kZSBTaWduaW5nIEludGVybWVkaWF0ZSBB\r\ndXRob3JpdHkwHhcNMjEwMzE4MTMwMTExWhcNMzEwNjI0MTMwMTExWjAiMSAwHgYD\r\nVQQDDBdpbnRlZ3JhdGlvbl9vcGVucHJvamVjdDCCAiIwDQYJKoZIhvcNAQEBBQAD\r\nggIPADCCAgoCggIBALn0ohZShOzR6UJAuN4IErLD5jenUWr83XnKCouC0qeXH6FI\r\nTNGTyOy\/KbDDRIoL1L20xYRl5UKwTbDye10ItUBhNcv72pJ2rDOSJrL84fqMxf00\r\nWdd\/APXJfNNqtgh1QTq9vvim9YCEu7JdeIhZK9ea89RPn47iSj7YijY78mGBfyfm\r\nqpHRYX\/QZAQcwjO2lE9soWUaZlrqu3mxTI218zmaqqcma4x3QakfsZeXZhQSU7D1\r\n6iYG8wy8IaYueJM5OoRRziBXoIfPpwYpEj4RhV1WME9jGhutyrHYg3jAdfvzsFVG\r\ngSVUP2ey1sq3HGZGbzWMBFLDGqfet0lGBIB0HTna1Zvu3ZnuK2uV3MObCmBBbBSs\r\n\/s8hyQTqWEbY2aqVoTBN5lyogwfL6pgZJFvhmtg21oHxBBqqAeQ+TZmWD62WorsX\r\n4F6Ahh1VKkmr5LkVvr2CfME0M1mj9s9gSc7ekXk1oHabH+wwgJV2ZhyezhXgWKgL\r\nUahjSRzkKqp5mbh27sg1kLCx9QNyXxaz8rnAcazGB00JzQlUmXg76cJ0v\/M3qihz\r\nQR5oju\/iMiUYKtqec9LU6wfvmGOOvtl2OFOD3ff69FPS2Km8He4pFWkSqw4DGivE\r\nIJLlgqLGIkWm+uNyocANtYqib52AYwJ\/nFMF6nzOvM1LoxHyJlFmudZRju2jAgMB\r\nAAEwDQYJKoZIhvcNAQELBQADggEBAD8mQtw0p3oh9fyOuyTmalHxoG9rLiV0Q2mz\r\n1T0jonVYN7YqSxS\/yWIQnZQ98x2nU93Be4G9VaLT0NZvRjnem2zemSVvuwp11GeK\r\ne80gJTaJjh8n1Z+gD6GU4C+LjWeiR75sd6Jcqfp3bqL6FGvSzIk3QQOfWuC03aXa\r\nFRleNH6rkMV30sWnXyocatculf7ThHZQMN1c0KuQFrd\/alQh\/+EyjBleLozkeC6G\r\n9IlE9DGRK0NUSvy7W68I7cVhR2ToE8oApdOJ1Cd6TpTYMRtvI2lQ4F7vF++ym0Lw\r\nMIxSI44hNeixh8Yn9rcy\/LqOUgl0niB5hfAiauRwHcOY5wf1hKE=\r\n-----END CERTIFICATE-----"
+# SIGNATURE="W3OmQmIGWOPH/1vJB6S8jSpGtrt1BSzpA9QPjSH5m5cRZ0BPn11trsbORNfgoHu4pYaVdNPQuspDJwmsjFgcpwVNV4HA0cwdiCwXi3iawHI3AYszId0rCVBHQX6CkTxEzAfg1NT3y40IV1awlWKh7i1+EuLUAjDfwzelCb73Wx17nNo9kq0a25YyMw8qAiGnCXWzgJTpS1zQpfawVaXRCvSLnaFtS1UsofLpr66+gteLpXPNy+WTfEwDe97HIgiNFEY4jz61P9HhXLEAep14UpYUvWtvrbMAt0ZKfQhwJv6aQrZFxGR+N7Kb4NGeaX2JC+NWbddEMv1qI6Y8X67XjFqLd8pg4aVtZQUX84zE5EKe74risrb3E1iH8R/rX/GOmEYlaab6UY0Fw0sAVGu1BUimyq5AYQW8ZOGfa71QWjzxM5mUHG+7UhBDS6DRHMSP3W5fckDB9EpuqRuBydl6Z0FVomIbbMq1kUWQd36+TeZnRzqY0WMcCLvbrXFcOFDf2nrhurbKPyup7jLRlIQvxUP2QqGizDaIziBUjbAtPW3WikOfpNELZAaNQ++1bpjt1+MPxe3ayJ85pzzuWzWmXKQrB97Tqfwsv7p3AwvQog3Mm95xckmONAece31GXQNAvg191B5roINSz+0oL6ed6w8qdfqlScQnjGWUDa0PwT0="
+
+# WORKING_DIRECTORY=/home/runner/work/integration_openproject/integration_openproject DOWNLOAD_URL=https://github.com/nabim777/integration_openproject/actions/runs/25713127501/artifacts/6935964419 bash ./self-hosted-app-store.sh
+
+CRT_DIR=${WORKING_DIRECTORY}/publish/app.crt
+SIGN_DIR=${WORKING_DIRECTORY}/publish/sign.txt
+
+log_info "Reading certificate and signature files..."
+log_info "Certificate file: $CRT_DIR"
+log_info "Signature file: $SIGN_DIR"
+log_info "Download URL: $DOWNLOAD_URL"
+
+if [ ! -f "$CRT_DIR" ] || [ ! -s "$CRT_DIR" ]; then
+  log_error "Certificate file not found or empty at $CRT_DIR"
+  exit 1
+elif [ ! -f "$SIGN_DIR" ] || [ ! -s "$SIGN_DIR" ]; then
+  log_error "Signature file not found or empty at $SIGN_DIR"
+  exit 1
+fi
+
+CERTIFICATE=$(awk '{printf "%s%s", sep, $0; sep="\\r\\n"} END{print ""}' "$CRT_DIR")
+SIGNATURE=$(tr -d '\n' < "$SIGN_DIR")
+
+registerApps() {
+  app_name=$1
+
+  register_app=$(curl -s -o /dev/null -w "%{http_code}" -X POST -uadmin:admin \
+    http://localhost:8000/api/v1/apps \
+    -H "Content-Type: application/json" \
+    -d "{
+    \"certificate\": \"${CERTIFICATE}\",
+    \"signature\": \"${SIGNATURE}\"
+    }")
+  if [[ ${register_app} == 201 ]]; then
+    log_success "\"${app_name}\" has been registered successfully!"
+  elif [[ ${register_app} == 204 ]]; then
+    log_info "\"${app_name}\" has been updated!"
+  elif [[ ${register_app} == 400 ]]; then
+    log_error "\"${app_name}\" contains invalid characters, the signature!"
+    exit 1
+  else
+    log_error "Failed to register \"${app_name}\""
+    exit 1
+  fi
+}
+
+# curl -s -X POST -uadmin:admin \
+#     http://localhost:8000/api/v1/apps/releases \
+#     -H "Content-Type: application/json" \
+#     -d "{
+#     \"download\":\"http://localhost/integration_openproject-2.9.2.tar.gz\",
+#     \"signature\": \"W3OmQmIGWOPH/1vJB6S8jSpGtrt1BSzpA9QPjSH5m5cRZ0BPn11trsbORNfgoHu4pYaVdNPQuspDJwmsjFgcpwVNV4HA0cwdiCwXi3iawHI3AYszId0rCVBHQX6CkTxEzAfg1NT3y40IV1awlWKh7i1+EuLUAjDfwzelCb73Wx17nNo9kq0a25YyMw8qAiGnCXWzgJTpS1zQpfawVaXRCvSLnaFtS1UsofLpr66+gteLpXPNy+WTfEwDe97HIgiNFEY4jz61P9HhXLEAep14UpYUvWtvrbMAt0ZKfQhwJv6aQrZFxGR+N7Kb4NGeaX2JC+NWbddEMv1qI6Y8X67XjFqLd8pg4aVtZQUX84zE5EKe74risrb3E1iH8R/rX/GOmEYlaab6UY0Fw0sAVGu1BUimyq5AYQW8ZOGfa71QWjzxM5mUHG+7UhBDS6DRHMSP3W5fckDB9EpuqRuBydl6Z0FVomIbbMq1kUWQd36+TeZnRzqY0WMcCLvbrXFcOFDf2nrhurbKPyup7jLRlIQvxUP2QqGizDaIziBUjbAtPW3WikOfpNELZAaNQ++1bpjt1+MPxe3ayJ85pzzuWzWmXKQrB97Tqfwsv7p3AwvQog3Mm95xckmONAece31GXQNAvg191B5roINSz+0oL6ed6w8qdfqlScQnjGWUDa0PwT0=\"
+#     }"
+
+# {"download":["URL must end with .tar.gz"]}
+
+publishApps() {
+  app_name=$1
+  app_version=$2
+
+  	# \"download\":\"https://github.com/nextcloud/${app_name}/releases/download/v${app_version}/${app_name}-${app_version}.tar.gz\",
+
+
+  register_app=$(curl -s -o /dev/null -w "%{http_code}" -X POST -uadmin:admin \
+    http://localhost:8000/api/v1/apps/releases \
+    -H "Content-Type: application/json" \
+    -d "{
+    \"download\":\"${DOWNLOAD_URL}\",
+    \"signature\": \"${SIGNATURE}\"
+    }")
+  if [[ ${register_app} == 200 ]]; then
+    log_success "\"${app_name} ${app_version}\" has been updated successfully!"
+  elif [[ ${register_app} == 201 ]]; then
+    log_success "\"${app_name} ${app_version}\" has been published successfully!"
+  else
+    log_error "Failed to publish \"${app_name} ${app_version}\""
+    exit 1
+  fi
+}
+
+registerApps "integration_openproject"
+publishApps "integration_openproject" "2.9.2"
