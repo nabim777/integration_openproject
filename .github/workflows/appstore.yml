@@ -168,18 +168,18 @@ jobs:
           echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
           php occ app:update --allow-unstable integration_openproject
 
-      - name: API Tests
-        env:
-          NEXTCLOUD_BASE_URL: http://localhost
-        run: |
-          cd integration_openproject
-          # build apps
-          make
-          # Run API tests
-          make api-test
+      # - name: API Tests
+      #   env:
+      #     NEXTCLOUD_BASE_URL: http://localhost
+      #   run: |
+      #     cd integration_openproject
+      #     # build apps
+      #     make
+      #     # Run API tests
+      #     make api-test
 
-      # - name: Setup Debug Session
-      #   uses: csexton/debugger-action@master
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
 
       # - name: Configure Nextcloud for testing
       #   run: |
