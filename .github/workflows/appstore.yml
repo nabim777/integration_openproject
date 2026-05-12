@@ -127,7 +127,9 @@ jobs:
         id: first-artifact-upload
         uses: actions/upload-artifact@v7
         with:
+          # name: integration_openproject-apps
           path: publish/integration_openproject*.tar.gz
+          archive: false
           if-no-files-found: error
       
       - name: Get the download link
@@ -181,6 +183,9 @@ jobs:
             echo "FAILED (status: $status)"
           fi
 
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
+
       - name: Register and publish apps
         env:
           WORKING_DIRECTORY: ${{ github.workspace }}
@@ -198,9 +203,6 @@ jobs:
           php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
           php occ config:system:set allow_local_remote_servers --value true
           php occ app:enable integration_openproject
-
-      # - name: Setup Debug Session
-      #   uses: csexton/debugger-action@master
 
       # - name: Configure Nextcloud for testing
       #   run: |
