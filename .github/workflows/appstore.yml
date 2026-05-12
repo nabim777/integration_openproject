@@ -130,10 +130,19 @@ jobs:
             echo "FAILED (status: $status)"
           fi
         
-      - name: Register and publish apps
+      - name: Register and publish integration_openproject apps
         env:
           APP_ID: integration_openproject
           APP_VERSION: 2.9.2
+          SIGNATURE: signature1
+        run: |
+          cd integration_openproject
+          bash ./.github/scripts/self-hosted-app-store.sh
+
+      - name: Register and publish groupfolders apps
+        env:
+          APP_ID: groupfolders
+          APP_VERSION: 17.0.15
           SIGNATURE: signature1
         run: |
           cd integration_openproject
@@ -151,6 +160,7 @@ jobs:
           php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
           php occ config:system:set allow_local_remote_servers --value true
           php occ app:install integration_openproject
+          php occ app:install groupfolders
 
       - name: Register and publish next release of the app
         env:
@@ -168,18 +178,19 @@ jobs:
           echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
           php occ app:update --allow-unstable integration_openproject
 
-      # - name: API Tests
-      #   env:
-      #     NEXTCLOUD_BASE_URL: http://localhost
-      #   run: |
-      #     cd integration_openproject
-      #     # build apps
-      #     make
-      #     # Run API tests
-      #     make api-test
+      - name: API Tests
+        env:
+          NEXTCLOUD_BASE_URL: http://localhost
+        run: |
+          cd integration_openproject
+          # build apps
+          make
+          # Run API tests
+          # make api-test
+          make api-test FEATURE_PATH=tests/acceptance/features/api/capabilities.feature
 
-      - name: Setup Debug Session
-        uses: csexton/debugger-action@master
+      # - name: Setup Debug Session
+      #   uses: csexton/debugger-action@master
 
       # - name: Configure Nextcloud for testing
       #   run: |
