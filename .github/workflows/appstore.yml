@@ -134,6 +134,10 @@ jobs:
           fi
         
       - name: Register and publish apps
+        env:
+          APP_ID: integration_openproject
+          APP_VERSION: 2.9.2
+          SIGNATURE: signature1
         run: |
           wget https://raw.githubusercontent.com/nabim777/integration_openproject/${{github.head_ref}}/.github/scripts/self-hosted-app-store.sh
           bash ./self-hosted-app-store.sh
@@ -150,6 +154,21 @@ jobs:
           php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
           php occ config:system:set allow_local_remote_servers --value true
           php occ app:install integration_openproject
+
+      - name: Register and publish another apps
+        env:
+          APP_ID: integration_openproject
+          APP_VERSION: 2.10.0
+          SIGNATURE: signature2
+        run: |
+          bash ./self-hosted-app-store.sh
+
+      - name: upgrade apps
+        run: |
+          cd ~/html/nextcloud
+          # latest data didn't get fetched properly, so we need to clear the appstore cache
+          echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
+          php occ app:update --allow-unstable integration_openproject
 
       # - name: Setup Debug Session
       #   uses: csexton/debugger-action@master
