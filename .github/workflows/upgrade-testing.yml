@@ -1,23 +1,42 @@
-# This workflow is provided via the organization template repository
-#
-# https://github.com/nextcloud/.github
-# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
-
-# SPDX-FileCopyrightText: 2022 Free Software Foundation Europe e.V. <https://fsfe.org>
-#
-# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileCopyrightText: 2026 Jankari Tech Pvt. Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 name: Upgrade Testing
 
 on: [pull_request]
 
 jobs:
-  build:
+  create-matrix:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+
+      - name: Create matrix
+        id: create-matrix
+        env:
+          NEXTCLOUD_VERSIONS: "29"
+          PHP_VERSIONS: "8.2"
+        run: |
+          MATRIX=$(./.github/scripts/generate-matrix.sh)
+          echo "matrix={\"include\": [$MATRIX]}" >> $GITHUB_OUTPUT
+    outputs:
+      matrix: ${{ steps.create-matrix.outputs.matrix }}
+
+  upgrade-test:
+    name: Upgrade Testing
+    needs: create-matrix
+    if: ${{ success() }}
+    strategy:
+      matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
     runs-on: ubuntu-latest
+
     env:
       DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
+      PREVIOUS_APP_VERSION: 2.9.2
+      UPGRADE_APP_VERSION: 2.10.0
+      APPSTORE_BASE_URL: http://localhost:8000
     services:
-
       database-mysql:
         image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
         env:
@@ -33,7 +52,16 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           path: integration_openproject
+          fetch-tags: true
+          ref: v${{ env.UPGRADE_APP_VERSION }}
 
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          repository: nextcloud/activity
+          ref: ${{ matrix.nextcloudVersion }}
+          path: activity
+          
       - name: Setup NodeJS
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
         with:
@@ -45,24 +73,19 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@a4e22b60bbb9c1021113f2860347b0759f66fe5d
         with:
-          php-version: '8.2'
+          php-version: ${{ format('{0}.{1}', matrix.phpVersionMajor,matrix.phpVersionMinor) }}
           extensions: mbstring, intl, mysql, gd
           ini-values: post_max_size=256M, max_execution_time=180
-          coverage: xdebug
-          tools: php-cs-fixer, phpunit
 
       - name: Build nextcloud project
-        # if: ${{ startsWith( steps.tag.outputs.currenttag , 'v' ) }}
-        # id: build_release
         run: |
           export DEBIAN_FRONTEND=noninteractive
           echo "###### installing nextcloud"
           mkdir ~/html
-          git clone https://github.com/nextcloud/server.git --recursive --depth 1 -b stable29 ~/html/nextcloud
+          git clone https://github.com/nextcloud/server.git --recursive --depth 1 -b ${{ matrix.nextcloudVersion }} ~/html/nextcloud
           cd ~/html/nextcloud
           git submodule update --init
           mkdir -p data
-          # chown -R www-data:www-data config data apps
           php occ maintenance:install \
             --database mysql \
             --database-name nextcloud \
@@ -123,7 +146,7 @@ jobs:
       - name: Check for Appstore
         run: |
           cd appstore
-          status=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:8000)
+          status=$(curl -o /dev/null -s -w "%{http_code}" "$APPSTORE_BASE_URL")
           if [ "$status" -eq 200 ]; then
             echo "OK"
           else
@@ -132,23 +155,18 @@ jobs:
         
       - name: Register and publish integration_openproject apps
         env:
-          APP_ID: integration_openproject
-          APP_VERSION: 2.9.2
-          SIGNATURE: signature1
+          APP_VERSION: ${{ env.PREVIOUS_APP_VERSION }}
         run: |
-          cd integration_openproject
-          bash ./.github/scripts/self-hosted-app-store.sh
+          wget https://raw.githubusercontent.com/nabim777/integration_openproject/${{github.head_ref}}/.github/scripts/register-and-publish-app-to-self-hosted-appstore.sh
+          bash ./register-and-publish-app-to-self-hosted-appstore.sh
 
-      - name: Register and publish groupfolders apps
-        env:
-          APP_ID: groupfolders
-          APP_VERSION: 17.0.15
-          SIGNATURE: signature1
+      - name: Enable other apps from official app store
         run: |
-          cd integration_openproject
-          bash ./.github/scripts/self-hosted-app-store.sh
+          cp -R activity ~/html/nextcloud/apps
+          cd ~/html/nextcloud
+          php occ app:enable oidc user_oidc groupfolders activity
 
-      - name: Configure Nextcloud for testing
+      - name: Enable integration_openproject app from self-hosted app store
         run: |
           # making the signature verification always pass for testing
           # by making the $verified variable true in Installer.php
@@ -156,20 +174,19 @@ jobs:
           echo "::error::Failed to patch Installer.php with sed"
           exit 1
           }
+          # latest data didn't get fetched properly, so we need to clear the appstore cache
+          echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
           cd ~/html/nextcloud
-          php occ config:system:set appstoreurl --value http://localhost:8000/api/v1
+          php occ config:system:set ratelimit.protection.enabled --value false --type bool
+          php occ config:system:set appstoreurl --value "$APPSTORE_BASE_URL/api/v1"
           php occ config:system:set allow_local_remote_servers --value true
           php occ app:install integration_openproject
-          php occ app:install groupfolders
 
       - name: Register and publish next release of the app
         env:
-          APP_ID: integration_openproject
-          APP_VERSION: 2.10.0
-          SIGNATURE: signature2
+          APP_VERSION: ${{ env.UPGRADE_APP_VERSION }}
         run: |
-          cd integration_openproject
-          bash ./.github/scripts/self-hosted-app-store.sh
+          bash ./register-and-publish-app-to-self-hosted-appstore.sh
 
       - name: upgrade apps
         run: |
@@ -186,16 +203,4 @@ jobs:
           # build apps
           make
           # Run API tests
-          # make api-test
-          make api-test FEATURE_PATH=tests/acceptance/features/api/capabilities.feature
-
-      # - name: Setup Debug Session
-      #   uses: csexton/debugger-action@master
-
-      # - name: Configure Nextcloud for testing
-      #   run: |
-      #     ls -l
-
-      #     cd ~/html/nextcloud
-      #     ls -l
-      #     php occ app:install integration_openproject
+          make api-test
