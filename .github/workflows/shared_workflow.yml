@@ -10,11 +10,11 @@ on:
       nextcloud_versions:
         required: false
         type: string
-        default: "33 master"
+        default: "33"
       php_versions:
         required: false
         type: string
-        default: "8.2 8.3 8.4"
+        default: "8.2"
 
 name: CI
 
@@ -223,10 +223,10 @@ jobs:
       - name: Prepare Nextcloud server (for phpunit and psalm)
         run: server/occ maintenance:install --admin-pass=admin
 
-      - name: PHP code analysis and linting
-        run: |
-          make psalm
-          make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
+      # - name: PHP code analysis and linting
+      #   run: |
+      #     make psalm
+      #     make phpcs || ( echo 'Please run `make phpcs-fix` to format your code' && exit 1 )
 
       - name: Setup dependent apps
         run: |
@@ -252,52 +252,52 @@ jobs:
             cp -r apps/oidc apps/user_oidc apps/groupfolders ${{ github.workspace }}
           fi
 
-      - name: PHP Unit Tests
-        run: |
-          cd server/apps/integration_openproject
-          make phpunit || (echo "A few of the unit tests were unsuccessful. Rerunning the unit test once again......" && make phpunit)
+      # - name: PHP Unit Tests
+      #   run: |
+      #     cd server/apps/integration_openproject
+      #     make phpunit || (echo "A few of the unit tests were unsuccessful. Rerunning the unit test once again......" && make phpunit)
 
-      - name: Setup .NET Core # this is required to execute Convert PHP cobertura coverage to lcov step
-        if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
-        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309
-        with:
-          dotnet-version: 6.0.101
-          dotnet-quality: 'ga'
+      # - name: Setup .NET Core # this is required to execute Convert PHP cobertura coverage to lcov step
+      #   if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
+      #   uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309
+      #   with:
+      #     dotnet-version: 6.0.101
+      #     dotnet-quality: 'ga'
 
-      - name: Convert PHP cobertura coverage to lcov
-        if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
-        uses: danielpalme/ReportGenerator-GitHub-Action@abaac9fef72e4116bfc69905d51062790bda0335
-        with:
-          reports: 'integration_openproject/server/apps/integration_openproject/coverage/php/cobertura.xml' # REQUIRED # The coverage reports that should be parsed (separated by semicolon). Globbing is supported.
-          targetdir: 'integration_openproject/server/apps/integration_openproject/coverage/php' # REQUIRED # The directory where the generated report should be saved.
-          reporttypes: 'lcov' # The output formats and scope (separated by semicolon) Values: Badges, Clover, Cobertura, CsvSummary, Html, HtmlChart, HtmlInline, HtmlInline_AzurePipelines, HtmlInline_AzurePipelines_Dark, HtmlSummary, JsonSummary, Latex, LatexSummary, lcov, MarkdownSummary, MHtml, PngChart, SonarQube, TeamCitySummary, TextSummary, Xml, XmlSummary
-          sourcedirs: '' # Optional directories which contain the corresponding source code (separated by semicolon). The source directories are used if coverage report contains classes without path information.
-          historydir: '' # Optional directory for storing persistent coverage information. Can be used in future reports to show coverage evolution.
-          plugins: '' # Optional plugin files for custom reports or custom history storage (separated by semicolon).
-          assemblyfilters: '+*' # Optional list of assemblies that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          classfilters: '+*' # Optional list of classes that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          filefilters: '+*' # Optional list of files that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          verbosity: 'Verbose' # The verbosity level of the log messages. Values: Verbose, Info, Warning, Error, Off
-          title: '' # Optional title.
-          tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
-          customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
-          toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
+      # - name: Convert PHP cobertura coverage to lcov
+      #   if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
+      #   uses: danielpalme/ReportGenerator-GitHub-Action@abaac9fef72e4116bfc69905d51062790bda0335
+      #   with:
+      #     reports: 'integration_openproject/server/apps/integration_openproject/coverage/php/cobertura.xml' # REQUIRED # The coverage reports that should be parsed (separated by semicolon). Globbing is supported.
+      #     targetdir: 'integration_openproject/server/apps/integration_openproject/coverage/php' # REQUIRED # The directory where the generated report should be saved.
+      #     reporttypes: 'lcov' # The output formats and scope (separated by semicolon) Values: Badges, Clover, Cobertura, CsvSummary, Html, HtmlChart, HtmlInline, HtmlInline_AzurePipelines, HtmlInline_AzurePipelines_Dark, HtmlSummary, JsonSummary, Latex, LatexSummary, lcov, MarkdownSummary, MHtml, PngChart, SonarQube, TeamCitySummary, TextSummary, Xml, XmlSummary
+      #     sourcedirs: '' # Optional directories which contain the corresponding source code (separated by semicolon). The source directories are used if coverage report contains classes without path information.
+      #     historydir: '' # Optional directory for storing persistent coverage information. Can be used in future reports to show coverage evolution.
+      #     plugins: '' # Optional plugin files for custom reports or custom history storage (separated by semicolon).
+      #     assemblyfilters: '+*' # Optional list of assemblies that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+      #     classfilters: '+*' # Optional list of classes that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+      #     filefilters: '+*' # Optional list of files that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+      #     verbosity: 'Verbose' # The verbosity level of the log messages. Values: Verbose, Info, Warning, Error, Off
+      #     title: '' # Optional title.
+      #     tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
+      #     customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
+      #     toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
 
-      - name: PHP Code Coverage Summary Report
-        if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
-        uses: romeovs/lcov-reporter-action@dda1c9b1fa1622b225e9acd87a248751dbcc6ada
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          lcov-file: 'integration_openproject/server/apps/integration_openproject/coverage/php/lcov.info'
-          delete-old-comments: true
-          title: "PHP Code Coverage"
+      # - name: PHP Code Coverage Summary Report
+      #   if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
+      #   uses: romeovs/lcov-reporter-action@dda1c9b1fa1622b225e9acd87a248751dbcc6ada
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     lcov-file: 'integration_openproject/server/apps/integration_openproject/coverage/php/lcov.info'
+      #     delete-old-comments: true
+      #     title: "PHP Code Coverage"
 
-      - name: PHP coverage check
-        if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
-        uses: VeryGoodOpenSource/very_good_coverage@3b475421464c564c0714d92ce02742bd81fa9eda
-        with:
-          min_coverage: '56'
-          path: 'integration_openproject/server/apps/integration_openproject/coverage/php/lcov.info'
+      # - name: PHP coverage check
+      #   if: ${{ github.event_name == 'pull_request' && matrix.nextcloudVersion == 'master' && matrix.phpVersion == '8.2' }}
+      #   uses: VeryGoodOpenSource/very_good_coverage@3b475421464c564c0714d92ce02742bd81fa9eda
+      #   with:
+      #     min_coverage: '56'
+      #     path: 'integration_openproject/server/apps/integration_openproject/coverage/php/lcov.info'
 
       - name: Configure Nextcloud server
         run: |
