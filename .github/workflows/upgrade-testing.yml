@@ -5,6 +5,9 @@ name: Upgrade Testing
 
 on: [pull_request]
 
+env:
+  TAG: 3.3.1
+
 jobs:
   create-matrix:
     runs-on: ubuntu-22.04
@@ -30,11 +33,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
     runs-on: ubuntu-latest
-
-    env:
-      DJANGO_SETTINGS_MODULE: nextcloudappstore.settings.development
-      PREVIOUS_APP_VERSION: 2.9.2
-      UPGRADE_APP_VERSION: 2.10.0
     services:
       database-mysql:
         image: ghcr.io/nextcloud/continuous-integration-mariadb-10.5:latest
@@ -117,14 +115,11 @@ jobs:
           APP_ID: integration_openproject
           NEXCLOUD_PATH: /home/runner/html/nextcloud
           WORKING_DIRECTORY: ${{ github.workspace }}
-          TAG: 3.3.1
         run: |
           cd integration_openproject
-          bash .github/scripts/upgradeTesting/build-and-release.sh
+          bash .github/scripts/build-and-release.sh
 
       - name: Update integration_openproject app
-        env:
-            TAG: 3.3.1
         run: |
           # latest data didn't get fetched properly, so we need to clear the appstore cache
           echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
@@ -132,34 +127,20 @@ jobs:
           php occ config:system:set ratelimit.protection.enabled --value false --type bool
           php occ config:system:set appstoreurl --value "http://localhost"
           php occ config:system:set allow_local_remote_servers --value true
-
-      # - name: Setup Debug Sessionz
-      #   uses: csexton/debugger-action@master
-
-      
-      - name: Verify app update
-        env:
-          TAG: 3.3.1
-        run: |
-          cd ~/html/nextcloud
           php occ app:update --allow-unstable integration_openproject
-          php occ app:list
           if php occ app:list | grep -q "integration_openproject.*$TAG"; then
             echo "App updated successfully to version $TAG"
           else
             echo "App not updated to version $TAG"
             exit 1
           fi
-  
 
-
-
-      # - name: API Tests
-      #   env:
-      #     NEXTCLOUD_BASE_URL: http://localhost
-      #   run: |
-      #     cd integration_openproject
-      #     # build apps
-      #     make
-      #     # Run API tests
-      #     make api-test
+      - name: API Tests
+        env:
+          NEXTCLOUD_BASE_URL: http://localhost
+        run: |
+          cd integration_openproject
+          # build apps
+          make
+          # Run API tests
+          make api-test
