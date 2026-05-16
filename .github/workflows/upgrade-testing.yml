@@ -132,6 +132,16 @@ jobs:
           php occ config:system:set ratelimit.protection.enabled --value false --type bool
           php occ config:system:set appstoreurl --value "http://localhost"
           php occ config:system:set allow_local_remote_servers --value true
+
+      # - name: Setup Debug Sessionz
+      #   uses: csexton/debugger-action@master
+
+      
+      - name: Verify app update
+        env:
+          TAG: 3.3.1
+        run: |
+          cd ~/html/nextcloud
           php occ app:update --allow-unstable integration_openproject
           php occ app:list
           if php occ app:list | grep -q "integration_openproject.*$TAG"; then
@@ -142,8 +152,7 @@ jobs:
           fi
   
 
-      # - name: Setup Debug Sessionz
-      #   uses: csexton/debugger-action@master
+
 
       # - name: API Tests
       #   env:

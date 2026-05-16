@@ -87,6 +87,9 @@ integration_openproject publish/
 
 cd publish
 
+# update version in info.xml
+sed -i "s|<version>.*</version>|<version>$TAG</version>|" "integration_openproject/appinfo/info.xml" 
+
 # https://nextcloudappstore.readthedocs.io/en/latest/developer.html#obtaining-a-certificate
 log_info "Generating app.key and app.crt..."
 sudo openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
