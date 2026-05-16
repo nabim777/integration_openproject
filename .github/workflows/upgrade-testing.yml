@@ -140,7 +140,5 @@ jobs:
           NEXTCLOUD_BASE_URL: http://localhost
         run: |
           cd integration_openproject
-          # build apps
-          make
           # Run API tests
           make api-test
