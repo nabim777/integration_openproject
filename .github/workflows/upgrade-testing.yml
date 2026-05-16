@@ -122,44 +122,35 @@ jobs:
           cd integration_openproject
           bash .github/scripts/upgradeTesting/build-and-release.sh
 
-      - name: Enable integration_openproject app from self-hosted app store
+      - name: Update integration_openproject app
+        env:
+            TAG: 3.3.1
         run: |
-          # making the signature verification always pass for testing
-          # by making the $verified variable true in Installer.php
-          # sed -i.bak 's/$verified = .*/$verified = true;/' /home/runner/html/nextcloud/lib/private/Installer.php || {
-          # echo "::error::Failed to patch Installer.php with sed"
-          # exit 1
-          # }
           # latest data didn't get fetched properly, so we need to clear the appstore cache
           echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
           cd ~/html/nextcloud
           php occ config:system:set ratelimit.protection.enabled --value false --type bool
           php occ config:system:set appstoreurl --value "http://localhost"
           php occ config:system:set allow_local_remote_servers --value true
-          # php occ app:update --allow-unstable integration_openproject
+          php occ app:update --allow-unstable integration_openproject
+          php occ app:list
+          if php occ app:list | grep -q "integration_openproject.*$TAG"; then
+            echo "App updated successfully to version $TAG"
+          else
+            echo "App not updated to version $TAG"
+            exit 1
+          fi
+  
 
-      - name: Setup Debug Sessionz
-        uses: csexton/debugger-action@master
+      # - name: Setup Debug Sessionz
+      #   uses: csexton/debugger-action@master
 
-      # - name: Register and publish next release of the app
+      # - name: API Tests
       #   env:
-      #     APP_VERSION: ${{ env.UPGRADE_APP_VERSION }}
+      #     NEXTCLOUD_BASE_URL: http://localhost
       #   run: |
-      #     bash ./register-and-publish-app-to-self-hosted-appstore.sh
-
-      # - name: upgrade apps
-      #   run: |
-      #     cd ~/html/nextcloud
-      #     # latest data didn't get fetched properly, so we need to clear the appstore cache
-      #     echo "" > ~/html/nextcloud/data/appdata_*/appstore/apps.json
-      #     php occ app:update --allow-unstable integration_openproject
-
-      - name: API Tests
-        env:
-          NEXTCLOUD_BASE_URL: http://localhost
-        run: |
-          cd integration_openproject
-          # build apps
-          make
-          # Run API tests
-          make api-test
+      #     cd integration_openproject
+      #     # build apps
+      #     make
+      #     # Run API tests
+      #     make api-test

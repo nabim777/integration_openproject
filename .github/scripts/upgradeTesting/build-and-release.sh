@@ -139,9 +139,15 @@ fi
 log_success "Archived the app into $APP_ID-$TAG.tar.gz."
 
 # Sign the archive
-sudo openssl dgst -sha512 -sign app.key $APP_ID-$TAG.tar.gz | openssl base64 || { log_error "Failed to sign the archive."; exit 1; }
+sudo openssl dgst -sha512 -sign app.key $APP_ID-$TAG.tar.gz | openssl base64 | tee ${WORKING_DIRECTORY}/publish/sign.txt || { log_error "Failed to sign the archive."; exit 1; }
+if [[ ! -s ${WORKING_DIRECTORY}/publish/sign.txt ]]; then
+  log_error "Failed to sign the archive. Signature file sign.txt is empty or not found."
+  exit 1
+else
+  log_success "Signed the app archive successfully."
+fi
 
-log_success "App build and release process ha been completed successfully."
+log_success "App build and release process has been completed successfully."
 
 ## copy archieve in nextcloud directory to download
 cp $APP_ID-$TAG.tar.gz ${NEXCLOUD_PATH}/$APP_ID-$TAG.tar.gz
@@ -158,8 +164,9 @@ if [[ ! -f ${WORKING_DIRECTORY}/publish/integration_openproject/appinfo/signatur
   exit 1
 fi
 
-SIGNATURE=$(jq -r '.signature' ${WORKING_DIRECTORY}/publish/integration_openproject/appinfo/signature.json)
-CERTIFICATE=$(jq '.certificate' ${WORKING_DIRECTORY}/publish/integration_openproject/appinfo/signature.json)
+# Convert sign.txt content to one line by removing newlines
+signature=$(tr -d '\n' < "${WORKING_DIRECTORY}/publish/sign.txt")
+certificate=$(jq '.certificate' ${WORKING_DIRECTORY}/publish/integration_openproject/appinfo/signature.json)
 
 cat > apps.json <<EOF
 [
@@ -175,11 +182,11 @@ cat > apps.json <<EOF
         ],
         "isNightly": false,
         "rawPlatformVersionSpec": "\u003E=28 \u003C=31",
-        "signature": "$SIGNATURE",
+        "signature": "$signature",
         "signatureDigest": "sha512"
       }
     ],
-    "certificate": $CERTIFICATE
+    "certificate": $certificate
   }
 ]
 EOF
