@@ -273,6 +273,12 @@ class FeatureContext implements Context {
 			return;
 		}
 
+		// Skip if Nextcloud Docker container does not exist
+		exec("docker ps --format \"{{.Names}}\"", $output);
+		if(!in_array('nextcloud', $output)) {
+			return;
+		}
+
 		$firstChar = substr($user, 0, 1);
 		$restChars = substr($user, 1);
 		// Example: Carol -> [cC]arol
